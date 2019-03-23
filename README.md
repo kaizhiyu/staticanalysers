@@ -21,4 +21,8 @@ Install `staticanalysers-core` and `staticanalysers-maven-plugin` into your loca
 - [ ] `toString` using `org.apache.commons.lang3.builder.ToStringBuilder` with a different style than `SHORT_PREFIX_STYLE`
 - [ ] `toString` creating long representations probably not suitable for logging in info level 
  
+ ## Todos
+ 
+ - [ ] Make configurable which analyses to run
+ - [ ] Smart order of running analyses, this would allow to reuse caches of parsed files and already resolved symbols
  

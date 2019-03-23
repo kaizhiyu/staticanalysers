@@ -1,5 +1,7 @@
 package com.github.kgeilmann.core.analysis;
 
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.visitor.GenericVisitorAdapter;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
@@ -14,18 +16,18 @@ public class ObjectToStringCallAnalysis extends Analysis {
 
     private static final Set<String> LOGGER_METHODS = Set.of("trace", "debug", "info", "warn", "error", "fatal");
     private static final Set<String> QUALIFIED_LOGGER_METHODS = Set.of(
-            "org.apache.log4j.Category.trace(java.lang.Object)",
+            "org.apache.log4j.Logger.trace(java.lang.Object)",
             "org.apache.log4j.Category.debug(java.lang.Object)",
             "org.apache.log4j.Category.info(java.lang.Object)",
             "org.apache.log4j.Category.warn(java.lang.Object)",
             "org.apache.log4j.Category.error(java.lang.Object)",
             "org.apache.log4j.Category.fatal(java.lang.Object)",
-            "org.apache.log4j.Category.trace(Object,java.lang.Throwable)",
-            "org.apache.log4j.Category.debug(Object,java.lang.Throwable)",
-            "org.apache.log4j.Category.info(java.lang.Object,java.lang.Throwable)",
-            "org.apache.log4j.Category.warn(java.lang.Object,java.lang.Throwable)",
-            "org.apache.log4j.Category.error(java.lang.Object,java.lang.Throwable)",
-            "org.apache.log4j.Category.fatal(java.lang.Object,java.lang.Throwable)"
+            "org.apache.log4j.Logger.trace(java.lang.Object, java.lang.Throwable)",
+            "org.apache.log4j.Category.debug(java.lang.Object, java.lang.Throwable)",
+            "org.apache.log4j.Category.info(java.lang.Object, java.lang.Throwable)",
+            "org.apache.log4j.Category.warn(java.lang.Object, java.lang.Throwable)",
+            "org.apache.log4j.Category.error(java.lang.Object, java.lang.Throwable)",
+            "org.apache.log4j.Category.fatal(java.lang.Object, java.lang.Throwable)"
     );
 
     @Override
@@ -45,6 +47,18 @@ public class ObjectToStringCallAnalysis extends Analysis {
     private class Visitor extends GenericVisitorAdapter<Optional<AnalysisResult>, String> {
 
         @Override
+        public Optional<AnalysisResult> visit(ClassOrInterfaceDeclaration n, String arg) {
+            String declaredType = n.getName().asString();
+            return super.visit(n, declaredType);
+        }
+
+        @Override
+        public Optional<AnalysisResult> visit(EnumDeclaration n, String arg) {
+            String declaredType = n.getName().asString();
+            return super.visit(n, declaredType);
+        }
+
+        @Override
         public Optional<AnalysisResult> visit(MethodCallExpr mc, String arg) {
             if (!LOGGER_METHODS.contains(mc.getName().asString())) {
                 return super.visit(mc, arg);
@@ -58,7 +72,6 @@ public class ObjectToStringCallAnalysis extends Analysis {
             } catch (UnsolvedSymbolException e) {
                 return result(mc, UNSOLVED, arg);
             }
-
 
             return super.visit(mc, arg);
         }
