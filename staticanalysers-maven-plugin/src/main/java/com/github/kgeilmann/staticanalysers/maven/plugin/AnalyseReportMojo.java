@@ -27,7 +27,7 @@ import static org.apache.maven.doxia.sink.Sink.JUSTIFY_LEFT;
 @Mojo(name = "analyse", defaultPhase = LifecyclePhase.SITE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class AnalyseReportMojo extends AbstractMavenReport {
 
-    private ProjectReporter reporter = new ProjectReporter(getSink());
+    private ProjectReporter reporter = new ProjectReporter();
 
     @Override
     public String getOutputName() {
@@ -65,7 +65,7 @@ public class AnalyseReportMojo extends AbstractMavenReport {
             s.body();
 
             getLog().info("Analysing " + project.getName());
-            reporter.execute(project);
+            reporter.execute(project, s);
             getLog().info("... done");
 
             s.body_();

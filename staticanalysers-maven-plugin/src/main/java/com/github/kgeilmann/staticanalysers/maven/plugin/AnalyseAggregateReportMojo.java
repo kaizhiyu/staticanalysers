@@ -2,7 +2,6 @@ package com.github.kgeilmann.staticanalysers.maven.plugin;
 
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.doxia.sink.Sink;
-import org.apache.maven.lifecycle.internal.MojoExecutor;
 import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -19,6 +18,8 @@ import java.util.Locale;
 
 @Mojo(name = "analyse-aggregate", aggregator = true, defaultPhase = LifecyclePhase.SITE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, requiresProject = true)
 public class AnalyseAggregateReportMojo extends AbstractMavenReport {
+
+    private final ProjectReporter reporter = new ProjectReporter();
 
     @Override
     public String getOutputName() {
@@ -60,7 +61,7 @@ public class AnalyseAggregateReportMojo extends AbstractMavenReport {
 
             for (MavenProject p : reactorProjects) {
                 getLog().info("Analysing " + p.getName());
-                new ProjectReporter().execute(p, getSink(), getLog());
+                reporter.execute(p, s);
                 getLog().info("... done");
             }
 

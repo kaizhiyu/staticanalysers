@@ -19,13 +19,7 @@ import static org.apache.maven.doxia.sink.Sink.JUSTIFY_LEFT;
 
 public class ProjectReporter {
 
-    private final Sink sink;
-
-    public ProjectReporter(Sink sink) {
-        this.sink = sink;
-    }
-
-    protected void execute(MavenProject p) throws IOException, DependencyResolutionRequiredException {
+    protected void execute(MavenProject p, Sink sink) throws IOException, DependencyResolutionRequiredException {
 
         sink.section(1, new SinkEventAttributeSet());
         sink.sectionTitle(1, new SinkEventAttributeSet());
@@ -57,7 +51,7 @@ public class ProjectReporter {
         sink.text("Position");
         sink.tableHeaderCell_();
         sink.tableHeaderCell();
-        sink.text("Suspicious Expression");
+        sink.text("Expression");
         sink.tableHeaderCell_();
         sink.tableHeaderCell();
         sink.text("Complaint");

@@ -7,6 +7,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import com.github.javaparser.utils.ProjectRoot;
+import com.github.kgeilmann.core.analysis.ObjectToStringCallAnalysis;
 import com.github.kgeilmann.core.analysis.WrongLoggerAnalysis;
 import com.google.common.base.Preconditions;
 
@@ -25,6 +26,8 @@ public class Analyser {
         ProjectRoot project = createProjectRoot(sourceRoots, jars);
         WrongLoggerAnalysis wrongLogger = new WrongLoggerAnalysis(project);
         List<AnalysisResult> results = wrongLogger.analyse();
+        ObjectToStringCallAnalysis objToString = new ObjectToStringCallAnalysis(project);
+        results.addAll(objToString.analyse());
         return results;
     }
 

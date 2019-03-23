@@ -26,7 +26,7 @@ public class WrongLoggerAnalysis {
 
     private static final Logger LOG = Logger.getLogger(WrongLoggerAnalysis.class.getSimpleName());
     private static final String MESSAGE = "Wrong class in Logger.getLogger(Class), surrounding type is %s.";
-    private static final String UNSOLVED = "Could not solve method call in %s.";
+    static final String UNSOLVED = "Could not solve method call in %s.";
 
     private ProjectRoot project;
 
