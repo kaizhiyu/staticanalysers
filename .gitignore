@@ -1,0 +1,5 @@
+.idea/
+*.iml
+staticanalysers-core/src/test/demo/
+staticanalysers-maven-plugin/target/
+staticanalysers-core/target/
