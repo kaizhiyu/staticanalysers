@@ -5,7 +5,7 @@ import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.visitor.GenericVisitorAdapter;
+import com.github.javaparser.ast.visitor.GenericListVisitorAdapter;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
@@ -13,7 +13,8 @@ import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.kgeilmann.core.AnalysisResult;
 
-import java.util.Optional;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 public class ObjectToStringCallAnalysis extends Analysis {
@@ -46,26 +47,26 @@ public class ObjectToStringCallAnalysis extends Analysis {
     }
 
     @Override
-    GenericVisitorAdapter<Optional<AnalysisResult>, ?> getVisitor() {
+    GenericListVisitorAdapter<AnalysisResult, ?> getVisitor() {
         return new FindLoggerCallVisitor();
     }
 
-    private class FindLoggerCallVisitor extends GenericVisitorAdapter<Optional<AnalysisResult>, String> {
+    private class FindLoggerCallVisitor extends GenericListVisitorAdapter<AnalysisResult, String> {
 
         @Override
-        public Optional<AnalysisResult> visit(ClassOrInterfaceDeclaration n, String arg) {
+        public List<AnalysisResult> visit(ClassOrInterfaceDeclaration n, String arg) {
             String declaredType = n.getName().asString();
             return super.visit(n, declaredType);
         }
 
         @Override
-        public Optional<AnalysisResult> visit(EnumDeclaration n, String arg) {
+        public List<AnalysisResult> visit(EnumDeclaration n, String arg) {
             String declaredType = n.getName().asString();
             return super.visit(n, declaredType);
         }
 
         @Override
-        public Optional<AnalysisResult> visit(MethodCallExpr mc, String surroundingType) {
+        public List<AnalysisResult> visit(MethodCallExpr mc, String surroundingType) {
             if (!LOGGER_METHODS.contains(mc.getName().asString())) {
                 return super.visit(mc, surroundingType);
             }
@@ -76,7 +77,7 @@ public class ObjectToStringCallAnalysis extends Analysis {
                     return super.visit(mc, surroundingType);
                 }
             } catch (UnsolvedSymbolException e) {
-                return result(mc, UNSOLVED, surroundingType);
+                return Collections.singletonList(result(mc, UNSOLVED, surroundingType));
             }
 
             // interesting call to a logger method found, switch visitor to inspect the message argument
@@ -85,10 +86,12 @@ public class ObjectToStringCallAnalysis extends Analysis {
         }
     }
 
-    private class FindToStringCallVisitor extends GenericVisitorAdapter<Optional<AnalysisResult>, String> {
+    private class FindToStringCallVisitor extends GenericListVisitorAdapter<AnalysisResult, String> {
+
+        // FIXME: not handled Logger.debug(someNoneStringExpression)
 
         @Override
-        public Optional<AnalysisResult> visit(BinaryExpr expr, String arg) {
+        public List<AnalysisResult> visit(BinaryExpr expr, String arg) {
             if (!expr.getOperator().equals(BinaryExpr.Operator.PLUS)) {
                 return super.visit(expr, arg);
             }
@@ -114,15 +117,16 @@ public class ObjectToStringCallAnalysis extends Analysis {
             }
 
             if (!leftIsString && !rightIsString) {
-                // calculateResolvedType did return string, but its not, because string conversion on both sides needed -> Bug in Symbolsolver
+                // calculateResolvedType did return string, but its not, because string conversion on both sides needed -> Bug in symbol solver
                 throw new IllegalArgumentException("Something is wrong with binary expressions and string conversions.");
             }
 
-            return result(expr, MESSAGE_IMPLICIT, arg);
+            Expression problematicExpression = leftIsString ? expr.getRight() : expr.getLeft();
+            return Collections.singletonList(result(problematicExpression, MESSAGE_IMPLICIT, arg));
         }
 
         @Override
-        public Optional<AnalysisResult> visit(MethodCallExpr mc, String surroundingType) {
+        public List<AnalysisResult> visit(MethodCallExpr mc, String surroundingType) {
             try {
                 if (!"toString".equals(mc.getName().asString())) {
                     return super.visit(mc, surroundingType);
@@ -132,13 +136,19 @@ public class ObjectToStringCallAnalysis extends Analysis {
                     return super.visit(mc, surroundingType);
                 }
 
-                return result(mc, MESSAGE_EXPLICIT, surroundingType);
+                return Collections.singletonList(result(mc, MESSAGE_EXPLICIT, surroundingType));
             } catch (UnsolvedSymbolException e) {
-                return result(mc, UNSOLVED, surroundingType);
+                return Collections.singletonList(result(mc, UNSOLVED, surroundingType));
             }
         }
 
         private boolean isAcceptedImplicitCall(Expression exp) {
+            if (exp.calculateResolvedType().isPrimitive()) {
+                // primitive type would be converted to wrapper
+                // the wrappers have nice implementations -> no problems
+                return true;
+            }
+
             // change the ast to contain an explicit call
             MethodCallExpr call = new MethodCallExpr();
             exp.replace(call);
@@ -152,8 +162,8 @@ public class ObjectToStringCallAnalysis extends Analysis {
             return accepted;
         }
 
-        private boolean isAcceptedCall(MethodCallExpr mc) {
-            ResolvedMethodDeclaration toStringMethod = mc.resolve();
+        private boolean isAcceptedCall(MethodCallExpr toStringCall) {
+            ResolvedMethodDeclaration toStringMethod = toStringCall.resolve();
             if (!("java.lang.Object.toString()".equals(toStringMethod.getQualifiedSignature()))) {
                 return true;
             }
@@ -162,22 +172,23 @@ public class ObjectToStringCallAnalysis extends Analysis {
             // But flagging all found calls as error, would result is a lot of false positives, so let's accept some of these calls
 
             // Most interfaces don't declare toString() explicitly and we will accept that
-            return isCallOnInterfaceType(mc);
+            return isCallOnInterfaceType(toStringCall);
         }
 
-        private boolean isCallOnInterfaceType(MethodCallExpr mc) {
+        private boolean isCallOnInterfaceType(MethodCallExpr toStringCall) {
+            ResolvedType typeOfScope = toStringCall.getScope()
+                    .map(Expression::calculateResolvedType).orElseThrow(() -> new IllegalArgumentException("FIXME: No scope " + toStringCall.toString()));
+            return isInterfaceType(typeOfScope);
+        }
 
-            ResolvedType typeOfScope = mc.getScope()
-                    .map(Expression::calculateResolvedType).orElseThrow(() -> new IllegalArgumentException("FIXME: No scope " + mc.toString()));
+        private boolean isInterfaceType(ResolvedType typeOfScope) {
             if (typeOfScope.isReferenceType()) {
                 ResolvedReferenceTypeDeclaration typeDecl = typeOfScope.asReferenceType().getTypeDeclaration();
-                // TODO: make analysis more meaningful, by assuming closed world and checking that all classes implementing interface have correct toString method
                 return typeDecl.isInterface();
             } else if (typeOfScope.isTypeVariable()) {
-                // FIXME: handle by check on type bound?
-                throw new IllegalArgumentException("FIXME: scope is type variable " + mc.toString());
+                ResolvedType bound = typeOfScope.asTypeParameter().getLowerBound();
+                return isInterfaceType(bound);
             }
-
             return false;
         }
     }

@@ -13,13 +13,18 @@ Install `staticanalysers-core` and `staticanalysers-maven-plugin` into your loca
 `mvn com.github.kgeilmann:staticanalysers-maven-plugin:1.0.0-SNAPSHOT:analyse` or `mvn com.github.kgeilmann:staticanalysers-maven-plugin:1.0.0-SNAPSHOT:analyse-aggregate` to analyse your project.
 
 ## Analyses
-
+  
 - [x] Usage of wrong Logger (log4j 1.2 only): If org.apache.log4j.Logger#getLogger(Class) is called with X.class, X should be the surrounding type of the call.
 - [ ] Usage of not overwritten `Object.toString()` in logger calls. This usually means, we get a not so helpful log message containing stuff like x.y.z.SomeJavaClass@123566
-- [ ] Usage of not overwritten `Object.equals()` or `Object.hashCode()`.       
-- [ ] Log entries not starting with an uppercase letter
-- [ ] `toString` using `org.apache.commons.lang3.builder.ToStringBuilder` with a different style than `SHORT_PREFIX_STYLE`
-- [ ] `toString` creating long representations probably not suitable for logging in info level 
+  - [ ] Improvement: usage on abstract types is acceptable if all existing subtypes have an overwritten toString-method. Assumes closed world.
+  - [ ] Improvement: better handling of usage on types with wildcards (especially those without bounds)   
+
+Some more ideas, that I currently have no plans to implement them in the near future.  
+  
+- Usage of not overwritten `Object.equals()` or `Object.hashCode()`.       
+- Log entries not starting with an uppercase letter
+- `toString` using `org.apache.commons.lang3.builder.ToStringBuilder` with a different style than `SHORT_PREFIX_STYLE`
+- `toString` creating long representations probably not suitable for logging in info level 
  
  ## Todos
  

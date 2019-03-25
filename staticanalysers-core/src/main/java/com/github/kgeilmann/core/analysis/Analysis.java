@@ -4,8 +4,7 @@ import com.github.javaparser.Range;
 import com.github.javaparser.TokenRange;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.visitor.GenericVisitorAdapter;
+import com.github.javaparser.ast.visitor.GenericVisitor;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
 import com.github.kgeilmann.core.AnalysisResult;
@@ -13,8 +12,6 @@ import com.github.kgeilmann.core.AnalysisResult;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.logging.Logger;
 
 public abstract class Analysis {
@@ -50,9 +47,9 @@ public abstract class Analysis {
 
     private void analyse(List<AnalysisResult> results, CompilationUnit cu) {
         try {
-            Optional<AnalysisResult> result = cu.accept(this.getVisitor(), null);
-            if (result != null) {
-                result.ifPresent(ar -> {
+            List<AnalysisResult> cuResults = cu.accept(this.getVisitor(), null);
+            if (cuResults != null) {
+                cuResults.forEach(ar -> {
                     ar.setFilePath(cu.getStorage().get().getFileName());
                     results.add(ar);
                 });
@@ -63,12 +60,12 @@ public abstract class Analysis {
         }
     }
 
-    abstract GenericVisitorAdapter<Optional<AnalysisResult>, ?> getVisitor();
+    abstract GenericVisitor<List<AnalysisResult>, ?> getVisitor();
 
-    Optional<AnalysisResult> result(Node node, String message, String surroundingType) {
+    AnalysisResult result(Node node, String message, String surroundingType) {
         String location = node.getTokenRange().flatMap(TokenRange::toRange).map(Range::toString).orElse("");
         String expression = node.toString();
-        return Optional.of(new AnalysisResult(location, expression, String.format(message, surroundingType)));
+        return new AnalysisResult(location, expression, String.format(message, surroundingType));
     }
 }
 
