@@ -1,6 +1,6 @@
 # Static Analysers
 
-This is a small collection of static analysers for Java projects, together with a maven plugin to run them. It relies on the javaparser/javaparser project for the hard work of parsing java files and symbol solving. 
+This is a small collection of static analysers for Java projects, together with a maven plugin to run them. It relies on the [JavaParser](https://github.com/javaparser/javaparser) project for the hard work of parsing java files and symbol solving. 
 
 Be warned, this is "works good enough for me" software. It does not fulfill my criteria for production ready software, mainly because it's only tested by example (no unit test or other systematic tests).   
 It may or may not work for you.  
