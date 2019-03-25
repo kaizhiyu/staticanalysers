@@ -35,7 +35,7 @@ public class ObjectToStringCallAnalysis extends Analysis {
             "org.apache.log4j.Category.fatal(java.lang.Object, java.lang.Throwable)"
     );
     private static final String MESSAGE_EXPLICIT = "Call of toString() might be executed on java.lang.Object.";
-    private static final String MESSAGE_IMPLICIT = "Implicit call of toString() might be executed on java.lang.Object.";
+    private static final String MESSAGE_IMPLICIT = "ToString() will be called on expression and might be executed on java.lang.Object.";
 
     @Override
     public String getDescription() {
@@ -82,13 +82,14 @@ public class ObjectToStringCallAnalysis extends Analysis {
 
             // interesting call to a logger method found, switch visitor to inspect the message argument
             Expression message = mc.getArgument(0);
+            if (!"java.lang.String".equals(message.calculateResolvedType().describe()) && !isAcceptedImplicitCall(message)) {
+                return Collections.singletonList(result(message, MESSAGE_IMPLICIT, surroundingType));
+            }
             return message.accept(new FindToStringCallVisitor(), surroundingType);
         }
     }
 
     private class FindToStringCallVisitor extends GenericListVisitorAdapter<AnalysisResult, String> {
-
-        // FIXME: not handled Logger.debug(someNoneStringExpression)
 
         @Override
         public List<AnalysisResult> visit(BinaryExpr expr, String arg) {
@@ -142,54 +143,56 @@ public class ObjectToStringCallAnalysis extends Analysis {
             }
         }
 
-        private boolean isAcceptedImplicitCall(Expression exp) {
-            if (exp.calculateResolvedType().isPrimitive()) {
-                // primitive type would be converted to wrapper
-                // the wrappers have nice implementations -> no problems
-                return true;
-            }
 
-            // change the ast to contain an explicit call
-            MethodCallExpr call = new MethodCallExpr();
-            exp.replace(call);
-            call.setScope(exp);
-            call.setName("toString");
+    }
 
-            boolean accepted = isAcceptedCall(call);
-
-            // rollback the change in ast
-            call.replace(exp);
-            return accepted;
+    private boolean isAcceptedImplicitCall(Expression exp) {
+        if (exp.calculateResolvedType().isPrimitive()) {
+            // primitive type would be converted to wrapper
+            // the wrappers have nice implementations -> no problems
+            return true;
         }
 
-        private boolean isAcceptedCall(MethodCallExpr toStringCall) {
-            ResolvedMethodDeclaration toStringMethod = toStringCall.resolve();
-            if (!("java.lang.Object.toString()".equals(toStringMethod.getQualifiedSignature()))) {
-                return true;
-            }
+        // change the ast to contain an explicit call
+        MethodCallExpr call = new MethodCallExpr();
+        exp.replace(call);
+        call.setScope(exp);
+        call.setName("toString");
 
-            // It's really a call to Object.toString(), which we don't want to have at runtime.
-            // But flagging all found calls as error, would result is a lot of false positives, so let's accept some of these calls
+        boolean accepted = isAcceptedCall(call);
 
-            // Most interfaces don't declare toString() explicitly and we will accept that
-            return isCallOnInterfaceType(toStringCall);
+        // rollback the change in ast
+        call.replace(exp);
+        return accepted;
+    }
+
+    private boolean isAcceptedCall(MethodCallExpr toStringCall) {
+        ResolvedMethodDeclaration toStringMethod = toStringCall.resolve();
+        if (!("java.lang.Object.toString()".equals(toStringMethod.getQualifiedSignature()))) {
+            return true;
         }
 
-        private boolean isCallOnInterfaceType(MethodCallExpr toStringCall) {
-            ResolvedType typeOfScope = toStringCall.getScope()
-                    .map(Expression::calculateResolvedType).orElseThrow(() -> new IllegalArgumentException("FIXME: No scope " + toStringCall.toString()));
-            return isInterfaceType(typeOfScope);
-        }
+        // It's really a call to Object.toString(), which we don't want to have at runtime.
+        // But flagging all found calls as error, would result is a lot of false positives, so let's accept some of these calls
 
-        private boolean isInterfaceType(ResolvedType typeOfScope) {
-            if (typeOfScope.isReferenceType()) {
-                ResolvedReferenceTypeDeclaration typeDecl = typeOfScope.asReferenceType().getTypeDeclaration();
-                return typeDecl.isInterface();
-            } else if (typeOfScope.isTypeVariable()) {
-                ResolvedType bound = typeOfScope.asTypeParameter().getLowerBound();
-                return isInterfaceType(bound);
-            }
-            return false;
+        // Most interfaces don't declare toString() explicitly and we will accept that
+        return isCallOnInterfaceType(toStringCall);
+    }
+
+    private boolean isCallOnInterfaceType(MethodCallExpr toStringCall) {
+        ResolvedType typeOfScope = toStringCall.getScope()
+                .map(Expression::calculateResolvedType).orElseThrow(() -> new IllegalArgumentException("FIXME: No scope " + toStringCall.toString()));
+        return isInterfaceType(typeOfScope);
+    }
+
+    private boolean isInterfaceType(ResolvedType typeOfScope) {
+        if (typeOfScope.isReferenceType()) {
+            ResolvedReferenceTypeDeclaration typeDecl = typeOfScope.asReferenceType().getTypeDeclaration();
+            return typeDecl.isInterface();
+        } else if (typeOfScope.isTypeVariable()) {
+            ResolvedType bound = typeOfScope.asTypeParameter().getLowerBound();
+            return isInterfaceType(bound);
         }
+        return false;
     }
 }
